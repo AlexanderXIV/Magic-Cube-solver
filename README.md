@@ -1,2 +1,2 @@
-# Rubik-s-Cube-solver
-Rubik's Cube solver
+# Magic-Cube-solver
+Magic Cube solver
