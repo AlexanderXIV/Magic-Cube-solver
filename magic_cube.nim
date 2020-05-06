@@ -1,4 +1,4 @@
-import ../utils, ../render3
+import os, ../utils, ../render3
 
 for i in 0..10:
   echo "\n"
@@ -8,6 +8,8 @@ for i in 0..10:
 # 3: rechts, blau
 # 4: vorne, orange
 # 5: unten, gelb
+
+let optimal_fps = 60.0
 
 var
   s = 1.0
@@ -54,20 +56,23 @@ var button_down = false
 var scale = 1.0
 var change = true
 
+echo "starting"
 while is_running:
-  for event in window.poll():
+  let x = window.poll()
+  if x[1]: change = true
+  for event in x[0]:
     case event.kind:
       of EventQuit:
         is_running = false
         break
       of EventWheel, EventMove:
-        cont.process(event)
-        change = true
+        if cont.process(event):
+          change = true
       of EventButtonDown:
         button_down = true
       of EventButtonUp:
         button_down = false
-      else: echo event
+      else: discard#echo event
   
   if (button_down and s > 0.5) or (button_down == false and s < 1):
     change = true
@@ -80,15 +85,24 @@ while is_running:
     sh = s / 2
     sd = 1.5 * s + d
 
+  # ren.add(body1, color = red)
+  # ren.add(body1, color = red, rot = new_quat(Vec3(x: 1), Deg(180)))
+
+  # ren.add(body2, color = green, rot = new_quat(Vec3(x: 1), Deg(90)))
+  # ren.add(body2, color = green, rot = new_quat(Vec3(y: 1), Deg(90)))
+
+  # ren.add(body3, color = blue)
+  # ren.add(body3, color = blue, rot = new_quat(Vec3(z: 1), Deg(180)))
+
   if change:
     cont.update(ren.camera)
 
     ren.background(grey(1))
 
     for i1 in 0..<3:
-      var z = i1.toFloat * (s + d) - sd
+      var z = i1.float * (s + d) - sd
       for i2 in 0..<3:
-        var z2 = i2.toFloat * (s + d) - sd
+        var z2 = i2.float * (s + d) - sd
 
         for val in @[-(sh + d), -sh, sh, sh + d]:
           for nw in 0..1:
@@ -123,8 +137,12 @@ while is_running:
 
     ren.render(stats)
     window.swap()
-    change = false
 
-    # echo stats.average_fps()
-    stdout.write("\rfps: " & $stats.average_fps().toInt)
-    # stdout.flushFile()
+    stdout.write("\rfps: " & $stats.average_fps().int & "\t")
+
+  if change == false:
+    sleep(10)
+  elif change and stats.average_fps() > optimal_fps:
+    let fps = stats.average_fps() 
+    sleep((1000 * (fps - optimal_fps) / (optimal_fps * fps)).int)
+  change = false
