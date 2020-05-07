@@ -1,4 +1,4 @@
-import os, ../utils, ../render3
+import os, math, ../utils, ../render3
 
 for i in 0..10:
   echo "\n"
@@ -31,7 +31,7 @@ let
   orange = rgb(1, 0.5, 0)
   yellow = rgb(1, 1, 0)
 
-var body1, body2, body3 = Mesh()
+let face = Mesh()
 
 var
   cont = new_orbit_camera_controller()
@@ -39,9 +39,8 @@ var
   stats = Stats()
   is_running = true
 
-body1.add_quad(Vec3(x: -sh, y: -sh, z: 0), Vec3(x: s), Vec3(y: s))
-body2.add_quad(Vec3(x: 0, y: -sh, z: -sh), Vec3(y: s), Vec3(z: s))
-body3.add_quad(Vec3(x: -sh, y: 0, z: -sh), Vec3(z: s), Vec3(x: s))
+face.add_quad(Vec3(x: -sh, y: -sh, z: 0), Vec3(x: s), Vec3(y: s))
+face.add_quad(Vec3(x: -sh, y: -sh, z: 0), Vec3(y: s), Vec3(x: s))
 
 var cube: Cube
 for i in 0..<9:
@@ -52,9 +51,19 @@ for i in 0..<9:
   cube[4][i] = orange
   cube[5][i] = yellow
 
+proc draw_x(cube: Cube, ren1: var Render3, height: float, angle: float, scale: float) =
+  let
+    rd = degToRad(-angle)
+    x1 = cos(rd) * (s + d)
+    y1 = sin(rd) * (s + d)
+
+  for item in @[(0.0, 0.0), (x1, y1), (-x1, -y1), (y1, -x1), (-y1, x1), (x1 + y1, y1 - x1), (-x1 - y1, x1 - y1), (y1 - x1, -x1 - y1), (x1 - y1, x1 + y1)]:
+    ren1.add(face, color = cube[0][0], pos = Vec3(x: item[0], y: height + 0.5, z: item[1]), scale = scale, rot = new_quat(Vec3(y: 1), Deg(angle)) * new_quat(Vec3(x: 1), Deg(90)))
+
 var button_down = false
 var scale = 1.0
 var change = true
+var angle = 0.0
 
 echo "starting"
 while is_running:
@@ -73,63 +82,48 @@ while is_running:
       of EventButtonUp:
         button_down = false
       else: discard#echo event
-  
-  if (button_down and s > 0.5) or (button_down == false and s < 1):
+
+  if ((button_down and s > 0.5) or (button_down == false and s < 1)) and stats.average_fps() > 10:
     change = true
     if button_down and s > 0.5:
-      scale = scale - 0.01
+      scale = scale - 1 / stats.average_fps()
     else:
-      scale = scale + 0.01
+      scale = scale + 1 / stats.average_fps()
+      if scale > 1: scale = 1
     s = scale
     d = 1.6 - scale * 1.5
     sh = s / 2
     sd = 1.5 * s + d
 
-  # ren.add(body1, color = red)
-  # ren.add(body1, color = red, rot = new_quat(Vec3(x: 1), Deg(180)))
+  # ren.add(face, color = red)
+  # ren.add(face, color = green, rot = new_quat(Vec3(y: 1), Deg(90)))
+  # ren.add(face, color = blue, rot = new_quat(Vec3(x: 1), Deg(90)))
 
-  # ren.add(body2, color = green, rot = new_quat(Vec3(x: 1), Deg(90)))
-  # ren.add(body2, color = green, rot = new_quat(Vec3(y: 1), Deg(90)))
-
-  # ren.add(body3, color = blue)
-  # ren.add(body3, color = blue, rot = new_quat(Vec3(z: 1), Deg(180)))
-
-  if change:
+  if change or true:
     cont.update(ren.camera)
 
     ren.background(grey(1))
 
     for i1 in 0..<3:
-      var z = i1.float * (s + d) - sd
+      var z = (i1.float - 1) * (s + d)
       for i2 in 0..<3:
-        var z2 = i2.float * (s + d) - sd
+        var z2 = (i2.float - 1) * (s + d)
 
         for val in @[-(sh + d), -sh, sh, sh + d]:
-          for nw in 0..1:
-            ren.add(body1, color = black, pos = Vec3(x: z2 + sh, y: z + sh, z: val), rot=new_quat(Vec3(x: 1), Deg(nw * 180)), scale = scale)
-            ren.add(body2, color = black, pos = Vec3(x: val, y: z2 + sh, z: z + sh), rot=new_quat(Vec3(y: 1), Deg(nw * 180)), scale = scale)
-            ren.add(body3, color = black, pos = Vec3(x: z + sh, y: val, z: z2 + sh), rot=new_quat(Vec3(z: 1), Deg(nw * 180)), scale = scale)
+          ren.add(face, color = black, pos = Vec3(x: z2, y: z, z: val), scale = scale)
+          ren.add(face, color = black, pos = Vec3(x: val, y: z2, z: z), scale = scale, rot = new_quat(Vec3(y: 1), Deg(90)))
+          ren.add(face, color = black, pos = Vec3(x: z, y: val, z: z2), scale = scale, rot = new_quat(Vec3(x: 1), Deg(90)))
 
-        for i in 0..<6:
-          var val = 0
-          case i:
-          of 0: val = 3 * i2 + i1             # i1 + 3i2
-          of 1: val = 8 - (3 * i1 + i2)       # -3i1 + i2 + 8
-          of 2: val = 8 - (3 * i2 + i1)       # i1 - 3i2 + 8
-          of 3: val = 8 - (3 * i1 + (2 - i2)) # -3i1 + i2 + 6
-          of 4: val = 8 - (3 * i2 + (2 - i1)) # i1 - 3i2 + 6
-          of 5: val = 3 * (2 - i2) + i1       # i1 - 3i2 + 6
-          else: discard
+        ren.add(face, color = cube[0][8 - (3 * i2 + i1)], pos = Vec3(x: z, y: sd, z: z2), scale = scale, rot = new_quat(Vec3(x: 1), Deg(90)))
+        ren.add(face, color = cube[1][8 - (3 * i1 + i2)], pos = Vec3(x: sd, y: z2, z: z), scale = scale, rot = new_quat(Vec3(y: 1), Deg(90)))
+        ren.add(face, color = cube[2][8 - (3 * i1 + (2 - i2))], pos = Vec3(x: z2, y: z, z: -sd), scale = scale)
+        ren.add(face, color = cube[3][8 - (3 * i2 + (2 - i1))], pos = Vec3(x: -sd, y: z2, z: z), scale = scale, rot = new_quat(Vec3(y: 1), Deg(90)))
+        ren.add(face, color = cube[4][3 * i2 + i1], pos = Vec3(x: z2, y: z, z: sd), scale = scale)
+        ren.add(face, color = cube[5][3 * (2 - i2) + i1], pos = Vec3(x: z, y: -sd, z: z2), scale = scale, rot = new_quat(Vec3(x: 1), Deg(90)))
 
-          for nw in 0..1:
-            case i:
-            of 0: ren.add(body1, color = cube[i][val], pos = Vec3(x: z2 + sh, y: z + sh, z: sd), rot=new_quat(Vec3(x: 1), Deg(nw * 180)), scale = scale)
-            of 1: ren.add(body2, color = cube[i][val], pos = Vec3(x: sd, y: z2 + sh, z: z + sh), rot=new_quat(Vec3(y: 1), Deg(nw * 180)), scale = scale)
-            of 2: ren.add(body3, color = cube[i][val], pos = Vec3(x: z + sh, y: sd, z: z2 + sh), rot=new_quat(Vec3(z: 1), Deg(nw * 180)), scale = scale)
-            of 5: ren.add(body1, color = cube[i][val], pos = Vec3(x: z2 + sh, y: z + sh, z: -sd), rot=new_quat(Vec3(x: 1), Deg(nw * 180)), scale = scale)
-            of 3: ren.add(body2, color = cube[i][val], pos = Vec3(x: -sd, y: z2 + sh, z: z + sh), rot=new_quat(Vec3(y: 1), Deg(nw * 180)), scale = scale)
-            of 4: ren.add(body3, color = cube[i][val], pos = Vec3(x: z + sh, y: -sd, z: z2 + sh), rot=new_quat(Vec3(z: 1), Deg(nw * 180)), scale = scale)
-            else: discard
+        angle = angle + 0.1
+        draw_x(cube, ren, sd, angle, scale)
+
 
     ren.add(Light(kind: LightAmbient,
       ambient: 1
